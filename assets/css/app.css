@@ -1,3 +1,351 @@
 body {
-    background-color: lightgray;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+}
+
+.container-fluid {
+    padding: 40px 20px 20px 20px;
+}
+
+/* Main card container */
+.exchange-rates-card {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+    overflow: hidden;
+    margin-top: 20px;
+}
+
+.card-header {
+    background: linear-gradient(135deg, #5a67d8 0%, #667eea 35%, #764ba2 100%);
+    color: white;
+    padding: 24px 30px 24px 24px;
+    border: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.card-header h2 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 600;
+}
+
+.date-selector-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.date-selector-wrapper label {
+    color: rgba(255,255,255,0.9);
+    font-weight: 500;
+    margin: 0;
+}
+
+.date-input {
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 8px;
+    color: white;
+    padding: 8px 12px;
+    font-size: 14px;
+}
+
+.date-input:focus {
+    background: rgba(255,255,255,0.3);
+    border-color: rgba(255,255,255,0.5);
+    color: white;
+    box-shadow: 0 0 0 0.2rem rgba(255,255,255,0.25);
+}
+
+/* Table styling */
+.exchange-table {
+    margin: 0;
+    border: none;
+}
+
+.exchange-table thead th {
+    background: #f8f9fd;
+    border: none;
+    color: #6c757d;
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 20px 24px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.exchange-table tbody tr {
+    border: none;
+    transition: all 0.2s ease;
+}
+
+.exchange-table tbody tr:hover {
+    background: #f8f9fd;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+}
+
+.exchange-table tbody td {
+    border: none;
+    padding: 20px 24px;
+    vertical-align: middle;
+    border-bottom: 1px solid #f1f3f4;
+}
+
+/* Currency cell styling */
+.currency-cell {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.currency-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: bold;
+    color: white;
+    text-align: center;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.currency-icon:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.currency-icon.eur {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.currency-icon.usd {
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+}
+
+.currency-icon.czk {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+    font-size: 12px;
+}
+
+.currency-icon.idr {
+    background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%);
+    color: #2d3436;
+}
+
+.currency-icon.brl {
+    background: linear-gradient(135deg, #fd79a8 0%, #fdcb6e 100%);
+    font-size: 14px;
+}
+
+.currency-info h6 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.currency-info small {
+    color: #6c757d;
+    font-size: 13px;
+}
+
+/* Rate styling */
+.rate-cell {
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 15px;
+}
+
+.buy-rate {
+    color: #00b894;
+    font-weight: 600;
+}
+
+.sell-rate {
+    color: #e17055;
+    font-weight: 600;
+}
+
+/* Change percentage */
+.change-positive {
+    color: #00b894;
+    background: rgba(0, 184, 148, 0.1);
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    cursor: default;
+}
+
+.change-positive:hover {
+    background: rgba(0, 184, 148, 0.2);
+    transform: translateY(-1px);
+}
+
+.change-negative {
+    color: #e17055;
+    background: rgba(225, 112, 85, 0.1);
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    cursor: default;
+}
+
+.change-negative:hover {
+    background: rgba(225, 112, 85, 0.2);
+    transform: translateY(-1px);
+}
+
+/* Mini chart */
+.mini-chart {
+    width: 120px;
+    height: 40px;
+    position: relative;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.mini-chart:hover {
+    transform: scale(1.05);
+}
+
+.mini-chart svg {
+    width: 100%;
+    height: 100%;
+}
+
+.chart-line {
+    fill: none;
+    stroke-width: 2.5;
+    stroke: #00b894;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: stroke-width 0.2s ease;
+}
+
+.mini-chart:hover .chart-line {
+    stroke-width: 3;
+}
+
+.chart-area {
+    fill: url(#gradient);
+    opacity: 0.2;
+    transition: opacity 0.2s ease;
+}
+
+.mini-chart:hover .chart-area {
+    opacity: 0.4;
+}
+
+/* Loading spinner */
+.loading-container {
+    padding: 60px 0;
+    text-align: center;
+}
+
+.spinner-border {
+    color: #667eea;
+}
+
+
+
+/* Mobile Cards */
+.mobile-cards {
+    padding: 0 16px;
+}
+
+.currency-card {
+    background: white;
+    border-radius: 12px;
+    margin: 0 0 16px 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.currency-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+}
+
+.currency-card-header {
+    padding: 16px 20px;
+    background: linear-gradient(135deg, #f8f9fd 0%, #f1f3f6 100%);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.currency-card-body {
+    padding: 16px 20px;
+}
+
+.rate-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #f1f3f4;
+    min-height: 50px;
+}
+
+.rate-row:last-child {
+    border-bottom: none;
+}
+
+.rate-label {
+    color: #6c757d;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.rate-value {
+    color: #2c3e50;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.mini-chart-mobile {
+    width: 120px;
+    height: 40px;
+    flex-shrink: 0;
+    margin-left: 16px;
+}
+
+.mini-chart-mobile svg {
+    width: 100%;
+    height: 100%;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .container-fluid {
+        padding: 20px 8px;
+    }
+    
+    .card-header {
+        flex-direction: column;
+        gap: 16px;
+        align-items: flex-start;
+        padding: 20px 24px;
+    }
+    
+    .exchange-rates-card {
+        margin-top: 10px;
+    }
 }

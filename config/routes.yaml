@@ -1,12 +1,17 @@
-#home:
-#  path: /
-#  defaults: { _controller: 'AppBundle\Controller\DefaultController::indexAction' }
-#  methods:  GET
-#
+exchange_rates:
+    path: /api/exchange-rates
+    controller: App\Controller\ExchangeRateController::getCurrentRates
+    methods: [GET]
 
-setupcheck:
-    path: /api/setup-check
-    controller: App\Controller\DefaultController::setupCheck
+exchange_rates_history:
+    path: /api/exchange-rates/history
+    controller: App\Controller\ExchangeRateController::getHistoricalRates
+    methods: [GET]
+
+exchange_rates_supported:
+    path: /api/exchange-rates/supported
+    controller: App\Controller\ExchangeRateController::getSupportedCurrencies
+    methods: [GET]
 
 index:
     path: /{wildcard}
@@ -15,5 +20,4 @@ index:
     }
     requirements:
         wildcard: .*
-    # controller: App\Controller\DefaultController::index
 
