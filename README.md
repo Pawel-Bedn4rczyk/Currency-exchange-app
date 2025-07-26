@@ -13,7 +13,44 @@ Jak zacząć pracę
 1. Należy zrobić Fork z tego repozytorium [Jak forkować repozytorium w GitHub](https://docs.github.com/en/get-started/quickstart/fork-a-repo), w ten sposób tworząc sobie prywatne miejsce do pracy.
 1. Następnie w stworzonym przez siebie forku repozytorium stwórz branch od gałęzi master, na którym będziesz pracować, np: ` $ git checkout -b MojeZadanieJanKowalski `
 
-### Setup środowiska
+### Setup środowiska (zalecany - bez Docker)
+
+**Wymagania:**
+- PHP 8.2+ (np. XAMPP)
+- Composer
+- Node.js 18+
+
+**Kroki:**
+
+1. **Zainstaluj dependencies:**
+   ```bash
+   composer install
+   npm install
+   ```
+
+2. **Uruchom backend (Symfony) - Terminal 1:**
+   ```bash
+   # Windows (XAMPP)
+   php -S localhost:8000 -t public/
+   
+   # Linux/Mac
+   php -S localhost:8000 -t public/
+   ```
+
+3. **Uruchom frontend (dev-server z hot reload) - Terminal 2:**
+   ```bash
+   npm run dev-server
+   ```
+
+4. **Otwórz aplikację:**
+   - Główna aplikacja: http://localhost:8000
+   - Dev-server (tylko assety): http://localhost:8080
+
+**Hot reload:**
+- Zmiany w plikach PHP/Twig → odśwież stronę
+- Zmiany w plikach JS/CSS/React → automatyczne przeładowanie
+
+### Setup środowiska za pomocą vHost (alternatywny)
 
   1. Skonfiguruj sobie lokalny serwer (np. Apache) pod development; ustaw vHosta tak, żeby pod wybraną domeną pokazywał na odpowiedni katalog na dysku (tj. katalog `public/` z repo) - przykład poniżej:
 
