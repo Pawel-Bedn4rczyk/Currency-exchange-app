@@ -18,7 +18,7 @@ body {
 }
 
 .card-header {
-    background: linear-gradient(135deg, #5a67d8 0%, #667eea 35%, #764ba2 100%);
+    background: linear-gradient(135deg, #3a57da 0%, #3e44a5 35%, #2f1b44 100%);
     color: white;
     padding: 24px 30px 24px 24px;
     border: none;
@@ -83,12 +83,18 @@ body {
 .exchange-table tbody tr {
     border: none;
     transition: all 0.2s ease;
+    cursor: pointer;
 }
 
 .exchange-table tbody tr:hover {
     background: #f8f9fd;
     transform: translateY(-2px);
     box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+}
+
+.exchange-table tbody tr:hover .currency-icon {
+    transform: scale(1.1);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
 }
 
 .exchange-table tbody td {
@@ -106,7 +112,7 @@ body {
 }
 
 .currency-icon {
-    width: 40px;
+    min-width: 40px;
     height: 40px;
     border-radius: 50%;
     display: flex;
@@ -120,10 +126,6 @@ body {
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
-.currency-icon:hover {
-    transform: scale(1.1);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-}
 
 .currency-icon.eur {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -186,12 +188,14 @@ body {
     font-size: 13px;
     font-weight: 600;
     transition: all 0.2s ease;
-    cursor: default;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
 }
 
-.change-positive:hover {
-    background: rgba(0, 184, 148, 0.2);
-    transform: translateY(-1px);
+
+.change-positive i {
+    font-size: 11px;
 }
 
 .change-negative {
@@ -202,26 +206,32 @@ body {
     font-size: 13px;
     font-weight: 600;
     transition: all 0.2s ease;
-    cursor: default;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
 }
 
-.change-negative:hover {
-    background: rgba(225, 112, 85, 0.2);
-    transform: translateY(-1px);
+
+.change-negative i {
+    font-size: 11px;
 }
 
 /* Mini chart */
 .mini-chart {
-    width: 120px;
-    height: 40px;
+    width: 100%;
+    height: 100px;
+    border-radius: 4px;
+    padding: 0 8px;
     position: relative;
-    cursor: pointer;
-    transition: transform 0.2s ease;
 }
 
-.mini-chart:hover {
-    transform: scale(1.05);
+.mini-chart-mobile {
+    width: 180px;
+    height: 100px;
+    border-radius: 4px;
+    flex-shrink: 0;
 }
+
 
 .mini-chart svg {
     width: 100%;
@@ -230,25 +240,15 @@ body {
 
 .chart-line {
     fill: none;
-    stroke-width: 2.5;
-    stroke: #00b894;
+    stroke-width: 1;
     stroke-linecap: round;
-    stroke-linejoin: round;
-    transition: stroke-width 0.2s ease;
+    stroke-linejoin: miter;
+    transition: all 0.2s ease;
 }
 
-.mini-chart:hover .chart-line {
-    stroke-width: 3;
-}
 
 .chart-area {
-    fill: url(#gradient);
-    opacity: 0.2;
-    transition: opacity 0.2s ease;
-}
-
-.mini-chart:hover .chart-area {
-    opacity: 0.4;
+    transition: all 0.2s ease;
 }
 
 /* Loading spinner */
@@ -275,11 +275,17 @@ body {
     box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     overflow: hidden;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
+    cursor: pointer;
 }
 
 .currency-card:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+}
+
+.currency-card:hover .currency-icon {
+    transform: scale(1.1);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
 }
 
 .currency-card-header {

@@ -1,5 +1,3 @@
-// ./assets/js/components/ExchangeRatesDashboard.js
-
 import React, {Component} from 'react';
 import axios from 'axios';
 
@@ -61,15 +59,44 @@ class ExchangeRatesDashboard extends Component {
         const points = [];
         let baseValue = 20;
         const direction = trend === 'up' ? 1 : -1;
+        const numPoints = 50;
         
-        for (let i = 0; i < 14; i++) {
-            const x = (i / 13) * 100;
-            const noise = Math.sin((i + seed) * 0.8) * 3;
-            const trendValue = direction * (i * 1.2);
-            const y = Math.max(5, Math.min(35, baseValue + trendValue + noise));
+        let volatility = 0.5 + (seed % 3) * 0.2;
+        let currentValue = baseValue;
+        
+        for (let i = 0; i < numPoints; i++) {
+            const x = (i / (numPoints - 1)) * 100;
+            
+            const trendStrength = direction * (i / numPoints) * 12;
+            
+            const shortTermNoise = Math.sin((i + seed) * 0.8) * volatility * 4;
+            
+            const mediumTermNoise = Math.cos((i + seed * 2) * 0.4) * volatility * 5;
+            
+            const randomShock = (Math.random() - 0.5) * volatility * 2;
+            
+            const suddenJumps = Math.sin((i + seed) * 2.5) * volatility * 3;
+            
+            currentValue = baseValue + trendStrength + shortTermNoise + mediumTermNoise + randomShock + suddenJumps;
+            
+            const y = Math.max(5, Math.min(35, currentValue));
             points.push(`${x},${y}`);
+            
+            currentValue = y;
         }
+        
         return points.join(' ');
+    }
+
+    generateChartArea(points, isPositive) {
+        const pointArray = points.split(' ').map(p => p.split(','));
+        const areaPoints = [...pointArray];
+        
+        areaPoints.push([pointArray[pointArray.length - 1][0], '40']);
+        areaPoints.push(['0', '40']);
+        areaPoints.unshift(['0', pointArray[0][1]]);
+        
+        return areaPoints.map(p => p.join(',')).join(' ');
     }
 
     render() {
@@ -161,25 +188,30 @@ class ExchangeRatesDashboard extends Component {
                                                         <td>
                                                             <span className={currency.change >= 0 ? 'change-positive' : 'change-negative'}>
                                                                 {currency.change >= 0 ? '+' : ''}{currency.change.toFixed(1)}%
+                                                                <i className={currency.change >= 0 ? 'bi bi-arrow-up-right' : 'bi bi-arrow-down-right'}></i>
                                                             </span>
                                                         </td>
-                                                        <td>
+                                                        <td style={{width: '300px', padding: '8px 16px',}}>
                                                             <div className="mini-chart">
-                                                                <svg viewBox="0 0 100 40">
+                                                                <svg viewBox="0 0 100 40" style={{width: '100%', height: '100%', display: 'block'}}>
                                                                     <defs>
                                                                         <linearGradient id={`gradient-${index}`} x1="0%" y1="0%" x2="0%" y2="100%">
-                                                                            <stop offset="0%" stopColor={currency.trend === 'up' ? '#00b894' : '#e17055'} stopOpacity="0.3"/>
-                                                                            <stop offset="100%" stopColor={currency.trend === 'up' ? '#00b894' : '#e17055'} stopOpacity="0"/>
+                                                                            <stop offset="0%" stopColor={currency.change >= 0 ? '#00b894' : '#e17055'} stopOpacity="0.3"/>
+                                                                            <stop offset="100%" stopColor={currency.change >= 0 ? '#00b894' : '#e17055'} stopOpacity="0"/>
                                                                         </linearGradient>
                                                                     </defs>
                                                                     <polyline 
                                                                         className="chart-line" 
                                                                         points={this.generateMiniChart(currency.trend, index)}
-                                                                        stroke={currency.trend === 'up' ? '#00b894' : '#e17055'}
+                                                                        stroke={currency.change >= 0 ? '#00b894' : '#e17055'}
+                                                                        strokeWidth="2"
+                                                                        fill="none"
+                                                                        strokeLinecap="round"
+                                                                        strokeLinejoin="round"
                                                                     />
                                                                     <polygon 
                                                                         className="chart-area"
-                                                                        points={`0,40 ${this.generateMiniChart(currency.trend, index)} 100,40`}
+                                                                        points={this.generateChartArea(this.generateMiniChart(currency.trend, index), currency.change >= 0)}
                                                                         fill={`url(#gradient-${index})`}
                                                                     />
                                                                 </svg>
@@ -210,6 +242,7 @@ class ExchangeRatesDashboard extends Component {
                                                     </div>
                                                     <span className={currency.change >= 0 ? 'change-positive' : 'change-negative'}>
                                                         {currency.change >= 0 ? '+' : ''}{currency.change.toFixed(1)}%
+                                                        <i className={currency.change >= 0 ? 'bi bi-arrow-up-right' : 'bi bi-arrow-down-right'}></i>
                                                     </span>
                                                 </div>
                                                 <div className="currency-card-body">
@@ -230,21 +263,25 @@ class ExchangeRatesDashboard extends Component {
                                                     <div className="rate-row">
                                                         <span className="rate-label">Wykres (14 dni):</span>
                                                         <div className="mini-chart-mobile">
-                                                            <svg viewBox="0 0 100 40">
+                                                            <svg viewBox="0 0 100 40" style={{width: '100%', height: '100%', display: 'block', marginLeft: '10px'}}>
                                                                 <defs>
                                                                     <linearGradient id={`gradient-mobile-${index}`} x1="0%" y1="0%" x2="0%" y2="100%">
-                                                                        <stop offset="0%" stopColor={currency.trend === 'up' ? '#00b894' : '#e17055'} stopOpacity="0.3"/>
-                                                                        <stop offset="100%" stopColor={currency.trend === 'up' ? '#00b894' : '#e17055'} stopOpacity="0"/>
+                                                                        <stop offset="0%" stopColor={currency.change >= 0 ? '#00b894' : '#e17055'} stopOpacity="0.3"/>
+                                                                        <stop offset="100%" stopColor={currency.change >= 0 ? '#00b894' : '#e17055'} stopOpacity="0"/>
                                                                     </linearGradient>
                                                                 </defs>
                                                                 <polyline 
                                                                     className="chart-line" 
                                                                     points={this.generateMiniChart(currency.trend, index)}
-                                                                    stroke={currency.trend === 'up' ? '#00b894' : '#e17055'}
+                                                                    stroke={currency.change >= 0 ? '#00b894' : '#e17055'}
+                                                                    strokeWidth="2"
+                                                                    fill="none"
+                                                                    strokeLinecap="round"
+                                                                    strokeLinejoin="round"
                                                                 />
                                                                 <polygon 
                                                                     className="chart-area"
-                                                                    points={`0,40 ${this.generateMiniChart(currency.trend, index)} 100,40`}
+                                                                    points={this.generateChartArea(this.generateMiniChart(currency.trend, index), currency.change >= 0)}
                                                                     fill={`url(#gradient-mobile-${index})`}
                                                                 />
                                                             </svg>
