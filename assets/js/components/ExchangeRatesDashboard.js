@@ -6,15 +6,33 @@ class ExchangeRatesDashboard extends Component {
         super();
         this.state = { 
             exchangeRates: [], 
+            chartData: {},
             loading: true,
+            loadingCharts: false,
             error: null,
-            selectedDate: new Date().toISOString().split('T')[0]
+            selectedDate: new Date().toISOString().split('T')[0],
+            actualDataDate: null
         };
     }
 
     getBaseUrl() {
         return 'http://localhost:8000';
     }
+
+
+
+    // Format date in Polish
+    formatPolishDate(dateString) {
+        const date = new Date(dateString);
+        const options = { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        };
+        return date.toLocaleDateString('pl-PL', options);
+    }
+
+
 
     componentDidMount() {
         this.fetchExchangeRates();
@@ -24,12 +42,20 @@ class ExchangeRatesDashboard extends Component {
         const baseUrl = this.getBaseUrl();
         this.setState({ loading: true });
         
+        const currencyNames = {
+            'EUR': 'Euro',
+            'USD': 'Dolar amerykański',
+            'CZK': 'Korona czeska',
+            'BRL': 'Real brazylijski',
+            'IDR': 'Rupia indonezyjska'
+        };
+        
         axios.get(`${baseUrl}/api/exchange-rates`)
             .then(response => {
                 if (response.data.status === 'success') {
                     const exchangeRates = response.data.data.map(rate => ({
                         code: rate.code,
-                        name: rate.currency,
+                        name: currencyNames[rate.code] || rate.currency,
                         rate: rate.nbpRate,
                         buyRate: rate.buyRate,
                         sellRate: rate.sellRate,
@@ -37,10 +63,23 @@ class ExchangeRatesDashboard extends Component {
                         trend: rate.trend || 'neutral'
                     }));
                     
+                    // Sort by specified order
+                    const order = ['EUR', 'USD', 'CZK', 'BRL', 'IDR'];
+                    const sortedRates = order.map(code => 
+                        exchangeRates.find(rate => rate.code === code)
+                    ).filter(Boolean);
+
+                    // Save information about the data date
+                    const actualDataDate = response.data.actualDataDate;
+
                     this.setState({ 
-                        exchangeRates: exchangeRates, 
-                        loading: false 
+                        exchangeRates: sortedRates, 
+                        loading: false,
+                        actualDataDate: actualDataDate
                     });
+                    
+                    // Fetch chart data for each currency
+                    this.fetchChartDataForAllCurrencies();
                 } else {
                     throw new Error(response.data.message || 'API error');
                 }
@@ -55,11 +94,44 @@ class ExchangeRatesDashboard extends Component {
             });
     }
 
+    fetchChartDataForAllCurrencies() {
+        const baseUrl = this.getBaseUrl();
+        const { selectedDate, exchangeRates } = this.state;
+        
+        this.setState({ loadingCharts: true });
+        
+        const promises = exchangeRates.map(currency => 
+            axios.get(`${baseUrl}/api/exchange-rates/history`, {
+                params: {
+                    currency: currency.code,
+                    date: selectedDate
+                }
+            })
+        );
+        
+        Promise.all(promises)
+            .then(responses => {
+                const chartData = {};
+                responses.forEach((response, index) => {
+                    if (response.data.status === 'success') {
+                        const currencyCode = exchangeRates[index].code;
+                        chartData[currencyCode] = response.data.data.history;
+                    }
+                });
+                
+                this.setState({ chartData, loadingCharts: false });
+            })
+            .catch(error => {
+                console.error('Failed to fetch chart data:', error);
+                this.setState({ loadingCharts: false });
+            });
+    }
+
     generateMiniChart(trend, seed = 0) {
         const points = [];
         let baseValue = 20;
         const direction = trend === 'up' ? 1 : -1;
-        const numPoints = 50;
+        const numPoints = 14;
         
         let volatility = 0.5 + (seed % 3) * 0.2;
         let currentValue = baseValue;
@@ -99,13 +171,150 @@ class ExchangeRatesDashboard extends Component {
         return areaPoints.map(p => p.join(',')).join(' ');
     }
 
+    generateRealChartData(currencyCode) {
+        const { chartData } = this.state;
+        const data = chartData[currencyCode];
+        
+        if (!data || data.length === 0) {
+            return null; 
+        }
+        
+        // Sort data chronologically (from oldest to newest) for the chart
+        const sortedData = [...data].sort((a, b) => {
+            return new Date(a.effectiveDate) - new Date(b.effectiveDate);
+        });
+        
+        
+        const points = [];
+        const numPoints = sortedData.length;
+        
+        
+        // Find min and max for scaling - use nbpRate instead of mid
+        const rates = sortedData.map(item => item.nbpRate || item.mid);
+        const minRate = Math.min(...rates);
+        const maxRate = Math.max(...rates);
+        const range = maxRate - minRate || 1;
+        
+        // Generate points for the chart (from oldest to newest)
+        // Always stretch to full width of SVG (0-100)
+        for (let i = 0; i < numPoints; i++) {
+            const item = sortedData[i];
+            // Stretch evenly to full width, regardless of the number of points
+            const x = numPoints > 1 ? (i / (numPoints - 1)) * 100 : 50; // Center if only 1 point
+            const rate = item.nbpRate || item.mid;
+            const normalizedRate = ((rate - minRate) / range) * 30 + 5; // Scale to 5-35
+            const y = Math.max(5, Math.min(35, normalizedRate));
+            points.push(`${x},${y}`);
+        }
+        
+        return points.join(' ');
+    }
+
+    // Generate visible points (circles) on the chart
+    generateChartCircles(currencyCode) {
+        const { chartData } = this.state;
+        const data = chartData[currencyCode];
+        
+        if (!data || data.length === 0) {
+            return [];
+        }
+        
+        // Sort data chronologically (from oldest to newest)
+        const sortedData = [...data].sort((a, b) => {
+            return new Date(a.effectiveDate) - new Date(b.effectiveDate);
+        });
+        
+        const numPoints = sortedData.length; 
+        const rates = sortedData.map(item => item.nbpRate || item.mid);
+        const minRate = Math.min(...rates);
+        const maxRate = Math.max(...rates);
+        const range = maxRate - minRate || 1;
+        
+        const circles = [];
+        for (let i = 0; i < numPoints; i++) {
+            const item = sortedData[i];
+            const x = numPoints > 1 ? (i / (numPoints - 1)) * 100 : 50;
+            const rate = item.nbpRate || item.mid;
+            const normalizedRate = ((rate - minRate) / range) * 30 + 5;
+            const y = Math.max(5, Math.min(35, normalizedRate));
+            
+            circles.push({
+                x: x,
+                y: y,
+                date: item.effectiveDate
+            });
+        }
+        
+        return circles;
+    }
+
+    // Fetch exchange rates for selected date
+    fetchExchangeRatesForDate() {
+        const baseUrl = this.getBaseUrl();
+        const { selectedDate } = this.state;
+        
+        this.setState({ loading: true });
+        
+        const currencyNames = {
+            'EUR': 'Euro',
+            'USD': 'Dolar amerykański',
+            'CZK': 'Korona czeska',
+            'BRL': 'Real brazylijski',
+            'IDR': 'Rupia indonezyjska'
+        };
+        
+        axios.get(`${baseUrl}/api/exchange-rates`, {
+            params: {
+                date: selectedDate
+            }
+        })
+        .then(response => {
+            if (response.data.status === 'success') {
+                const exchangeRates = response.data.data.map(rate => ({
+                    code: rate.code,
+                    name: currencyNames[rate.code] || rate.currency,
+                    rate: rate.nbpRate,
+                    buyRate: rate.buyRate,
+                    sellRate: rate.sellRate,
+                    change: rate.percentageChange || 0,
+                    trend: rate.trend || 'neutral'
+                }));
+                
+                // Sort by specified order
+                const order = ['EUR', 'USD', 'CZK', 'BRL', 'IDR'];
+                const sortedRates = order.map(code => 
+                    exchangeRates.find(rate => rate.code === code)
+                ).filter(Boolean);
+                
+                // Update information about the data date
+                const actualDataDate = response.data.actualDataDate;
+                
+                this.setState({ 
+                    exchangeRates: sortedRates, 
+                    loading: false,
+                    actualDataDate: actualDataDate
+                });
+            } else {
+                throw new Error(response.data.message || 'API error');
+            }
+        })
+        .catch(error => {
+            console.error('Failed to fetch exchange rates for date:', error);
+            this.setState({ 
+                loading: false,
+                error: 'Nie udało się pobrać kursów walut dla wybranej daty.'
+            });
+        });
+    }
+
     render() {
-        const { loading, exchangeRates, selectedDate, error } = this.state;
+        const { loading, loadingCharts, exchangeRates, selectedDate, error, actualDataDate } = this.state;
+        const today = new Date().toISOString().split('T')[0];
         
         return(
             <div className="container-fluid">
-                <div className="row">
-                    <div className="col-12">
+                <div className="row justify-content-center">
+                    <div className=" col-md-12 col-lg-11 col-xl-8">
                         <div className="exchange-rates-card">
                             <div className="card-header">
                                 <h2>Kursy walut kantoru</h2>
@@ -116,21 +325,41 @@ class ExchangeRatesDashboard extends Component {
                                         id="dateSelector"
                                         className="date-input" 
                                         value={selectedDate}
+                                        max={today}
+                                        onKeyDown={e => e.preventDefault()}
+                                        onPaste={e => e.preventDefault()} 
                                         onChange={(e) => {
-                                            this.setState({selectedDate: e.target.value});
-                                            if (e.target.value !== new Date().toISOString().split('T')[0]) {
-                                                console.log('Note: NBP API provides current rates only. Historical selection affects chart data.');
-                                            }
+                                            this.setState({selectedDate: e.target.value}, () => {
+                                                // Fetch new exchange rates for selected date
+                                                this.fetchExchangeRatesForDate();
+                                                // Fetch chart data for all currencies
+                                                this.fetchChartDataForAllCurrencies();
+                                            });
                                         }}
                                     />
+                                    {(loading || loadingCharts) && (
+                                        <div className="loading-spinner-small">
+                                            <div className="spinner-border spinner-border-sm" role="status">
+                                                <span className="sr-only">Ładowanie...</span>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
+                                {actualDataDate && (
+                                    <div className={`data-status ${actualDataDate !== selectedDate ? 'different-date' : 'current-date'}`}>
+                                            <strong>Kurs z dnia: {this.formatPolishDate(actualDataDate)}</strong>
+                                    </div>
+                                )}
                             </div>
 
-                            {loading ? (
+
+
+                            {(loading || loadingCharts) ? (
                                 <div className="loading-container">
                                     <div className="spinner-border" role="status">
                                         <span className="sr-only">Ładowanie...</span>
                                     </div>
+                                    <p className="mt-3 text-muted">Ładowanie danych...</p>
                                 </div>
                             ) : error ? (
                                 <div className="error-container text-center p-4">
@@ -158,8 +387,7 @@ class ExchangeRatesDashboard extends Component {
                                                     <th>Kurs NBP</th>
                                                     <th>Kurs kupna</th>
                                                     <th>Kurs sprzedaży</th>
-                                                    <th>Zmiana</th>
-                                                    <th>Wykres (14 dni)</th>
+                                                    <th>Historia waluty 14 dni</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -185,36 +413,59 @@ class ExchangeRatesDashboard extends Component {
                                                             {currency.buyRate ? `${currency.buyRate.toFixed(4)} PLN` : '-'}
                                                         </td>
                                                         <td className="sell-rate">{currency.sellRate.toFixed(4)} PLN</td>
-                                                        <td>
-                                                            <span className={currency.change >= 0 ? 'change-positive' : 'change-negative'}>
-                                                                {currency.change >= 0 ? '+' : ''}{currency.change.toFixed(1)}%
-                                                                <i className={currency.change >= 0 ? 'bi bi-arrow-up-right' : 'bi bi-arrow-down-right'}></i>
-                                                            </span>
-                                                        </td>
-                                                        <td style={{width: '300px', padding: '8px 16px',}}>
-                                                            <div className="mini-chart">
-                                                                <svg viewBox="0 0 100 40" style={{width: '100%', height: '100%', display: 'block'}}>
-                                                                    <defs>
-                                                                        <linearGradient id={`gradient-${index}`} x1="0%" y1="0%" x2="0%" y2="100%">
-                                                                            <stop offset="0%" stopColor={currency.change >= 0 ? '#00b894' : '#e17055'} stopOpacity="0.3"/>
-                                                                            <stop offset="100%" stopColor={currency.change >= 0 ? '#00b894' : '#e17055'} stopOpacity="0"/>
-                                                                        </linearGradient>
-                                                                    </defs>
-                                                                    <polyline 
-                                                                        className="chart-line" 
-                                                                        points={this.generateMiniChart(currency.trend, index)}
-                                                                        stroke={currency.change >= 0 ? '#00b894' : '#e17055'}
-                                                                        strokeWidth="2"
-                                                                        fill="none"
-                                                                        strokeLinecap="round"
-                                                                        strokeLinejoin="round"
-                                                                    />
-                                                                    <polygon 
-                                                                        className="chart-area"
-                                                                        points={this.generateChartArea(this.generateMiniChart(currency.trend, index), currency.change >= 0)}
-                                                                        fill={`url(#gradient-${index})`}
-                                                                    />
-                                                                </svg>
+                                                        <td style={{ padding: '8px 8px 8px 12px',}} className="chart-cell">
+                                                            <div className="chart-cell-content">
+                                                                <div className="percentage-section">
+                                                                    <span className={currency.change >= 0 ? 'change-positive' : 'change-negative'}>
+                                                                        {currency.change >= 0 ? '+' : ''}{currency.change.toFixed(1)}%
+                                                                        <i className={currency.change >= 0 ? 'bi bi-arrow-up-right' : 'bi bi-arrow-down-right'}></i>
+                                                                    </span>
+                                                                </div>
+                                                            <div className="chart-section">
+                                                                {this.generateRealChartData(currency.code) ? (
+                                                                    <div className="mini-chart">
+                                                                        <svg viewBox="0 0 100 40" preserveAspectRatio="xMidYMid meet" style={{width: '100%', height: '100%', display: 'block'}}>
+                                                                            <defs>
+                                                                                <linearGradient id={`gradient-${index}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                                                                                    <stop offset="0%" stopColor={currency.change >= 0 ? '#00b894' : '#e17055'} stopOpacity="0.3"/>
+                                                                                    <stop offset="100%" stopColor={currency.change >= 0 ? '#00b894' : '#e17055'} stopOpacity="0"/>
+                                                                                </linearGradient>
+                                                                            </defs>
+                                                                            <polyline 
+                                                                                className="chart-line" 
+                                                                                points={this.generateRealChartData(currency.code)}
+                                                                                stroke={currency.change >= 0 ? '#00b894' : '#e17055'}
+                                                                                strokeWidth="2"
+                                                                                fill="none"
+                                                                                strokeLinecap="butt"
+                                                                                strokeLinejoin="miter"
+                                                                            />
+                                                                            <polygon 
+                                                                                className="chart-area"
+                                                                                points={this.generateChartArea(this.generateRealChartData(currency.code), currency.change >= 0)}
+                                                                                fill={`url(#gradient-${index})`}
+                                                                            />
+                                                                            {/* Chart points */}
+                                                                            {this.generateChartCircles(currency.code).map((circle, circleIndex) => (
+                                                                                <circle 
+                                                                                    key={circleIndex}
+                                                                                    cx={circle.x} 
+                                                                                    cy={circle.y} 
+                                                                                    r="0.8"
+                                                                                    fill={currency.change >= 0 ? '#00b894' : '#e17055'}
+                                                                                    stroke="white"
+                                                                                    strokeWidth="0.3"
+                                                                                    vectorEffect="non-scaling-stroke"
+                                                                                />
+                                                                            ))}
+                                                                        </svg>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="no-data-message">
+                                                                        <span>Brak danych</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -261,34 +512,52 @@ class ExchangeRatesDashboard extends Component {
                                                         <span className="rate-value sell-rate">{currency.sellRate.toFixed(4)} PLN</span>
                                                     </div>
                                                     <div className="rate-row">
-                                                        <span className="rate-label">Wykres (14 dni):</span>
-                                                        <div className="mini-chart-mobile">
-                                                            <svg viewBox="0 0 100 40" style={{width: '100%', height: '100%', display: 'block', marginLeft: '10px'}}>
-                                                                <defs>
-                                                                    <linearGradient id={`gradient-mobile-${index}`} x1="0%" y1="0%" x2="0%" y2="100%">
-                                                                        <stop offset="0%" stopColor={currency.change >= 0 ? '#00b894' : '#e17055'} stopOpacity="0.3"/>
-                                                                        <stop offset="100%" stopColor={currency.change >= 0 ? '#00b894' : '#e17055'} stopOpacity="0"/>
-                                                                    </linearGradient>
-                                                                </defs>
-                                                                <polyline 
-                                                                    className="chart-line" 
-                                                                    points={this.generateMiniChart(currency.trend, index)}
-                                                                    stroke={currency.change >= 0 ? '#00b894' : '#e17055'}
-                                                                    strokeWidth="2"
-                                                                    fill="none"
-                                                                    strokeLinecap="round"
-                                                                    strokeLinejoin="round"
-                                                                />
-                                                                <polygon 
-                                                                    className="chart-area"
-                                                                    points={this.generateChartArea(this.generateMiniChart(currency.trend, index), currency.change >= 0)}
-                                                                    fill={`url(#gradient-mobile-${index})`}
-                                                                />
-                                                            </svg>
-                                                        </div>
+                                                        <span className="rate-label">Historia waluty 14 dni:</span>
+                                                        {this.generateRealChartData(currency.code) ? (
+                                                            <div className="mini-chart-mobile">
+                                                                <svg viewBox="0 0 100 40" preserveAspectRatio="xMidYMid meet" style={{width: '100%', height: '100%', display: 'block', marginLeft: '10px'}}>
+                                                                    <defs>
+                                                                        <linearGradient id={`gradient-mobile-${index}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                                                                            <stop offset="0%" stopColor={currency.change >= 0 ? '#00b894' : '#e17055'} stopOpacity="0.3"/>
+                                                                            <stop offset="100%" stopColor={currency.change >= 0 ? '#00b894' : '#e17055'} stopOpacity="0"/>
+                                                                        </linearGradient>
+                                                                    </defs>
+                                                                    <polyline 
+                                                                        className="chart-line" 
+                                                                        points={this.generateRealChartData(currency.code)}
+                                                                        stroke={currency.change >= 0 ? '#00b894' : '#e17055'}
+                                                                        strokeWidth="2"
+                                                                        fill="none"
+                                                                        strokeLinecap="butt"
+                                                                        strokeLinejoin="miter"
+                                                                    />
+                                                                    <polygon 
+                                                                        className="chart-area"
+                                                                        points={this.generateChartArea(this.generateRealChartData(currency.code), currency.change >= 0)}
+                                                                        fill={`url(#gradient-mobile-${index})`}
+                                                                    />
+                                                                    {/* Chart points mobile */}
+                                                                    {this.generateChartCircles(currency.code).map((circle, circleIndex) => (
+                                                                        <circle 
+                                                                            key={circleIndex}
+                                                                            cx={circle.x} 
+                                                                            cy={circle.y} 
+                                                                            r="0.8"
+                                                                            fill={currency.change >= 0 ? '#00b894' : '#e17055'}
+                                                                            stroke="white"
+                                                                            strokeWidth="0.3"
+                                                                            vectorEffect="non-scaling-stroke"
+                                                                        />
+                                                                    ))}
+                                                                </svg>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="no-data-message-mobile">
+                                                                <span>Brak danych</span>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
-                                                    
                                             </div>
                                         ))}
                                     </div>
@@ -298,7 +567,7 @@ class ExchangeRatesDashboard extends Component {
                     </div>
                 </div>
             </div>
-        )
+        );
     }
 }
 

@@ -61,7 +61,7 @@ class NBPService
     }
 
     /**
-     * Pobiera historyczne kursy dla konkretnej waluty z ostatnich 14 dni
+     * Pobiera historyczne kursy dla konkretnej waluty - zawsze 14 dni roboczych wstecz od wybranej daty
      */
     public function getHistoricalRates(string $currencyCode, \DateTime $endDate): array
     {
@@ -70,15 +70,16 @@ class NBPService
         }
 
         try {
-            $startDate = (clone $endDate)->modify('-20 days');
+            // Get wider range (~30 days) to have buffer for weekends/holidays
+            $startDate = (clone $endDate)->modify('-30 days');
             
-            $response = $this->httpClient->get(
-                self::NBP_BASE_URL . '/rates/A/' . $currencyCode . '/' . 
-                $startDate->format('Y-m-d') . '/' . $endDate->format('Y-m-d') . '/', 
-                [
-                    'query' => ['format' => 'json']
-                ]
-            );
+            $url = self::NBP_BASE_URL . '/rates/A/' . $currencyCode . '/' . 
+                   $startDate->format('Y-m-d') . '/' . $endDate->format('Y-m-d') . '/';
+            
+            
+            $response = $this->httpClient->get($url, [
+                'query' => ['format' => 'json']
+            ]);
 
             $data = json_decode($response->getBody()->getContents(), true);
             
@@ -86,13 +87,26 @@ class NBPService
                 throw new \RuntimeException('Invalid NBP API response for historical data');
             }
 
-            $rates = $data['rates'];
+            $allRates = $data['rates'];
             
-            usort($rates, function($a, $b) {
+            // Sort from newest to oldest
+            usort($allRates, function($a, $b) {
                 return strcmp($b['effectiveDate'], $a['effectiveDate']);
             });
 
-            return array_slice($rates, 0, 14);
+            $filteredRates = [];
+            foreach ($allRates as $rate) {
+                if ($rate['effectiveDate'] <= $endDate->format('Y-m-d')) {
+                    $filteredRates[] = $rate;
+                    if (count($filteredRates) >= 14) {
+                        break;
+                    }
+                }
+            }
+            
+            error_log("Filtered to exactly " . count($filteredRates) . " working days for {$currencyCode}");
+            
+            return $filteredRates;
             
         } catch (GuzzleException $e) {
             throw new \RuntimeException("Failed to fetch historical rates for {$currencyCode}: " . $e->getMessage(), 0, $e);
@@ -132,22 +146,40 @@ class NBPService
     }
 
     /**
-     * Oblicza zmianę procentową na podstawie historii kursów
+     * Oblicza zmianę procentową na podstawie historii kursów - zawsze z dostępnych dni roboczych (max 14)
+     * Porównuje najnowszy dostępny kurs z najstarszym kursem z otrzymanego okresu
      */
     public function calculatePercentageChange(array $historicalRates): ?float
     {
         if (count($historicalRates) < 2) {
+            error_log("Not enough historical rates for percentage change calculation: " . count($historicalRates) . " records");
             return null;
         }
         
-        $newestRate = $historicalRates[0]['mid'];
+        // Get current rate (first in sorted array)
+        $currentRate = $historicalRates[0]['mid'];
+        
+        // Get oldest rate (last in sorted array)
         $oldestRate = end($historicalRates)['mid'];
+        
+        $daysCount = count($historicalRates);
+        
         
         if ($oldestRate == 0) {
             return null;
         }
         
-        $change = (($newestRate - $oldestRate) / $oldestRate) * 100;
-        return round($change, 2);
+        // Calculate percentage change: (current - oldest) / oldest * 100
+        $change = (($currentRate - $oldestRate) / $oldestRate) * 100;
+        
+        
+        // If change is too small, return 0
+        if (abs($change) < 0.01) {
+            return 0.0;
+        }
+        
+        $roundedChange = round($change, 2);
+        
+        return $roundedChange;
     }
 } 
