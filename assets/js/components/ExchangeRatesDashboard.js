@@ -500,13 +500,9 @@ class ExchangeRatesDashboard extends Component {
                                     )}
                                     %
                                     {currency.change !== 0 && (
-                                      <i
-                                        className={
-                                          currency.change > 0
-                                            ? "bi bi-arrow-up-right"
-                                            : "bi bi-arrow-down-right"
-                                        }
-                                      ></i>
+                                      <span>
+                                        {currency.change > 0 ? "↗" : "↘"}
+                                      </span>
                                     )}
                                   </span>
                                 </div>
@@ -635,13 +631,7 @@ class ExchangeRatesDashboard extends Component {
                             )}
                             %
                             {currency.change !== 0 && (
-                              <i
-                                className={
-                                  currency.change > 0
-                                    ? "bi bi-arrow-up-right"
-                                    : "bi bi-arrow-down-right"
-                                }
-                              ></i>
+                              <span>{currency.change > 0 ? "↗" : "↘"}</span>
                             )}
                           </span>
                         </div>

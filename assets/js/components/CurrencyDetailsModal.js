@@ -378,7 +378,7 @@ class CurrencyDetailsModal extends Component {
               </div>
             </div>
             <button className="modal-close-btn" onClick={onClose}>
-              <i className="bi bi-x"></i>
+              <span>×</span>
             </button>
           </div>
 
@@ -393,13 +393,7 @@ class CurrencyDetailsModal extends Component {
               {currency.change > 0 ? "+" : ""}
               {this.formatPercentage(currency.change, currency.code)}%
               {currency.change !== 0 && (
-                <i
-                  className={
-                    currency.change > 0
-                      ? "bi bi-arrow-up-right"
-                      : "bi bi-arrow-down-right"
-                  }
-                ></i>
+                <span>{currency.change > 0 ? "↗" : "↘"}</span>
               )}
             </span>
           </div>
