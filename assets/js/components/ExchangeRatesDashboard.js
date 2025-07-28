@@ -1,5 +1,6 @@
 import React, { Component } from "react";
 import axios from "axios";
+import CurrencyDetailsModal from "./CurrencyDetailsModal";
 
 class ExchangeRatesDashboard extends Component {
   constructor() {
@@ -12,14 +13,49 @@ class ExchangeRatesDashboard extends Component {
       error: null,
       selectedDate: new Date().toISOString().split("T")[0],
       actualDataDate: null,
+      selectedCurrency: null,
+      isModalOpen: false,
     };
+  }
+
+  // Funkcja pomocnicza do określania koloru na podstawie zmiany procentowej
+  getChangeColor(change) {
+    if (change === 0) return "#6c757d"; // Szary dla 0%
+    return change > 0 ? "#00b894" : "#e17055"; // Zielony dla dodatnich, czerwony dla ujemnych
+  }
+
+  // Funkcja pomocnicza do określania klasy CSS dla zmiany procentowej
+  getChangeClass(change) {
+    if (change === 0) return "change-neutral";
+    return change >= 0 ? "change-positive" : "change-negative";
+  }
+
+  // Formatowanie procentów z odpowiednią precyzją dla różnych walut
+  formatPercentage(change, currencyCode) {
+    // IDR: 3 miejsca po przecinku dla mikro-zmian (0.003%)
+    // Inne: 1 miejsce po przecinku (1.4%)
+    const decimals = currencyCode === "IDR" ? 3 : 1;
+    return change.toFixed(decimals);
+  }
+
+  // Formatowanie kursu waluty z odpowiednią precyzją dla kantoru
+  formatRate(rate, currencyCode = null) {
+    // Dla walut egzotycznych używaj większej precyzji niezależnie od wartości
+    if (currencyCode === "IDR") {
+      return rate.toFixed(8); // 8 miejsc po przecinku dla IDR (precyzja NBP)
+    }
+
+    // Zapasowe formatowanie na podstawie wartości kursu
+    if (rate < 0.001) return rate.toFixed(6); // Inne waluty egzotyczne
+    if (rate < 0.1) return rate.toFixed(5); // Niektóre waluty azjatyckie
+    return rate.toFixed(4); // EUR, USD, waluty standardowe
   }
 
   getBaseUrl() {
     return "http://localhost:8000";
   }
 
-  // Format date in Polish
+  // Formatowanie daty po polsku
   formatPolishDate(dateString) {
     const date = new Date(dateString);
     const options = {
@@ -60,13 +96,13 @@ class ExchangeRatesDashboard extends Component {
             trend: rate.trend || "neutral",
           }));
 
-          // Sort by specified order
+          // Sortuj w określonej kolejności
           const order = ["EUR", "USD", "CZK", "BRL", "IDR"];
           const sortedRates = order
             .map((code) => exchangeRates.find((rate) => rate.code === code))
             .filter(Boolean);
 
-          // Save information about the data date
+          // Zapisz informację o dacie danych
           const actualDataDate = response.data.actualDataDate;
 
           this.setState({
@@ -75,7 +111,7 @@ class ExchangeRatesDashboard extends Component {
             actualDataDate: actualDataDate,
           });
 
-          // Fetch chart data for each currency
+          // Pobierz dane wykresów dla każdej waluty
           this.fetchChartDataForAllCurrencies();
         } else {
           throw new Error(response.data.message || "API error");
@@ -124,40 +160,6 @@ class ExchangeRatesDashboard extends Component {
       });
   }
 
-  generateMiniChart(trend, seed = 0) {
-    const points = [];
-    let baseValue = 20;
-    const direction = trend === "up" ? 1 : -1;
-    const numPoints = 14;
-
-    let volatility = 0.5 + (seed % 3) * 0.2;
-    let currentValue = baseValue;
-
-    for (let i = 0; i < numPoints; i++) {
-      const x = (i / (numPoints - 1)) * 100;
-      const trendStrength = direction * (i / numPoints) * 12;
-      const shortTermNoise = Math.sin((i + seed) * 0.8) * volatility * 4;
-      const mediumTermNoise = Math.cos((i + seed * 2) * 0.4) * volatility * 5;
-      const randomShock = (Math.random() - 0.5) * volatility * 2;
-      const suddenJumps = Math.sin((i + seed) * 2.5) * volatility * 3;
-
-      currentValue =
-        baseValue +
-        trendStrength +
-        shortTermNoise +
-        mediumTermNoise +
-        randomShock +
-        suddenJumps;
-
-      const y = Math.max(5, Math.min(35, currentValue));
-      points.push(`${x},${y}`);
-
-      currentValue = y;
-    }
-
-    return points.join(" ");
-  }
-
   generateChartArea(points, isPositive) {
     const pointArray = points.split(" ").map((p) => p.split(","));
     const areaPoints = [...pointArray];
@@ -177,7 +179,7 @@ class ExchangeRatesDashboard extends Component {
       return null;
     }
 
-    // Sort data chronologically (from oldest to newest) for the chart
+    // Sortuj dane chronologicznie (od najstarszych do najnowszych) dla wykresu
     const sortedData = [...data].sort((a, b) => {
       return new Date(a.effectiveDate) - new Date(b.effectiveDate);
     });
@@ -185,28 +187,35 @@ class ExchangeRatesDashboard extends Component {
     const points = [];
     const numPoints = sortedData.length;
 
-    // Find min and max for scaling - use nbpRate instead of mid
+    // Znajdź min i max do skalowania - użyj nbpRate zamiast mid
     const rates = sortedData.map((item) => item.nbpRate || item.mid);
     const minRate = Math.min(...rates);
     const maxRate = Math.max(...rates);
-    const range = maxRate - minRate || 1;
+    const range = maxRate - minRate;
 
-    // Generate points for the chart (from oldest to newest)
-    // Always stretch to full width of SVG (0-100)
+    // Generowanie punktów dla wykresu (od najstarszych do najnowszych)
+    // Zawsze rozciągnij na pełną szerokość SVG (0-100)
     for (let i = 0; i < numPoints; i++) {
       const item = sortedData[i];
-      // Stretch evenly to full width, regardless of the number of points
-      const x = numPoints > 1 ? (i / (numPoints - 1)) * 100 : 50; // Center if only 1 point
+      // Rozciągnij równomiernie na pełną szerokość, niezależnie od liczby punktów
+      const x = numPoints > 1 ? (i / (numPoints - 1)) * 100 : 50; // Wyśrodkuj jeśli tylko 1 punkt
       const rate = item.nbpRate || item.mid;
-      const normalizedRate = ((rate - minRate) / range) * 30 + 5; // Scale to 5-35
-      const y = Math.max(5, Math.min(35, normalizedRate));
+
+      let y;
+      if (range === 0) {
+        // Wszystkie wartości są takie same - pozioma linia na środku
+        y = 20;
+      } else {
+        const normalizedRate = ((rate - minRate) / range) * 30 + 5; // Skaluj do 5-35
+        y = Math.max(5, Math.min(35, normalizedRate));
+      }
       points.push(`${x},${y}`);
     }
 
     return points.join(" ");
   }
 
-  // Generate visible points (circles) on the chart
+  // Generowanie widocznych punktów (kółek) na wykresie
   generateChartCircles(currencyCode) {
     const { chartData } = this.state;
     const data = chartData[currencyCode];
@@ -215,7 +224,7 @@ class ExchangeRatesDashboard extends Component {
       return [];
     }
 
-    // Sort data chronologically (from oldest to newest)
+    // Sortuj dane chronologicznie (od najstarszych do najnowszych)
     const sortedData = [...data].sort((a, b) => {
       return new Date(a.effectiveDate) - new Date(b.effectiveDate);
     });
@@ -224,15 +233,22 @@ class ExchangeRatesDashboard extends Component {
     const rates = sortedData.map((item) => item.nbpRate || item.mid);
     const minRate = Math.min(...rates);
     const maxRate = Math.max(...rates);
-    const range = maxRate - minRate || 1;
+    const range = maxRate - minRate;
 
     const circles = [];
     for (let i = 0; i < numPoints; i++) {
       const item = sortedData[i];
       const x = numPoints > 1 ? (i / (numPoints - 1)) * 100 : 50;
       const rate = item.nbpRate || item.mid;
-      const normalizedRate = ((rate - minRate) / range) * 30 + 5;
-      const y = Math.max(5, Math.min(35, normalizedRate));
+
+      let y;
+      if (range === 0) {
+        // Wszystkie wartości są takie same - pozioma linia na środku
+        y = 20;
+      } else {
+        const normalizedRate = ((rate - minRate) / range) * 30 + 5;
+        y = Math.max(5, Math.min(35, normalizedRate));
+      }
 
       circles.push({
         x: x,
@@ -244,7 +260,7 @@ class ExchangeRatesDashboard extends Component {
     return circles;
   }
 
-  // Fetch exchange rates for selected date
+  // Pobierz kursy walut dla wybranej daty
   fetchExchangeRatesForDate() {
     const baseUrl = this.getBaseUrl();
     const { selectedDate } = this.state;
@@ -277,13 +293,13 @@ class ExchangeRatesDashboard extends Component {
             trend: rate.trend || "neutral",
           }));
 
-          // Sort by specified order
+          // Sortuj w określonej kolejności
           const order = ["EUR", "USD", "CZK", "BRL", "IDR"];
           const sortedRates = order
             .map((code) => exchangeRates.find((rate) => rate.code === code))
             .filter(Boolean);
 
-          // Update information about the data date
+          // Zaktualizuj informację o dacie danych
           const actualDataDate = response.data.actualDataDate;
 
           this.setState({
@@ -303,6 +319,22 @@ class ExchangeRatesDashboard extends Component {
         });
       });
   }
+
+  // Obsługa otwierania modala ze szczegółami waluty
+  handleCurrencyClick = (currency) => {
+    this.setState({
+      selectedCurrency: currency,
+      isModalOpen: true,
+    });
+  };
+
+  // Obsługa zamykania modala
+  handleModalClose = () => {
+    this.setState({
+      selectedCurrency: null,
+      isModalOpen: false,
+    });
+  };
 
   render() {
     const {
@@ -410,7 +442,10 @@ class ExchangeRatesDashboard extends Component {
                       </thead>
                       <tbody>
                         {exchangeRates.map((currency, index) => (
-                          <tr key={currency.code}>
+                          <tr
+                            key={currency.code}
+                            onClick={() => this.handleCurrencyClick(currency)}
+                          >
                             <td>
                               <div className="currency-cell">
                                 <div
@@ -429,15 +464,23 @@ class ExchangeRatesDashboard extends Component {
                               </div>
                             </td>
                             <td className="rate-cell">
-                              {currency.rate.toFixed(4)} PLN
+                              {this.formatRate(currency.rate, currency.code)}{" "}
+                              PLN
                             </td>
                             <td className="buy-rate">
                               {currency.buyRate
-                                ? `${currency.buyRate.toFixed(4)} PLN`
+                                ? `${this.formatRate(
+                                    currency.buyRate,
+                                    currency.code
+                                  )} PLN`
                                 : "-"}
                             </td>
                             <td className="sell-rate">
-                              {currency.sellRate.toFixed(4)} PLN
+                              {this.formatRate(
+                                currency.sellRate,
+                                currency.code
+                              )}{" "}
+                              PLN
                             </td>
                             <td
                               style={{ padding: "8px 8px 8px 12px" }}
@@ -446,21 +489,25 @@ class ExchangeRatesDashboard extends Component {
                               <div className="chart-cell-content">
                                 <div className="percentage-section">
                                   <span
-                                    className={
-                                      currency.change >= 0
-                                        ? "change-positive"
-                                        : "change-negative"
-                                    }
+                                    className={this.getChangeClass(
+                                      currency.change
+                                    )}
                                   >
-                                    {currency.change >= 0 ? "+" : ""}
-                                    {currency.change.toFixed(1)}%
-                                    <i
-                                      className={
-                                        currency.change >= 0
-                                          ? "bi bi-arrow-up-right"
-                                          : "bi bi-arrow-down-right"
-                                      }
-                                    ></i>
+                                    {currency.change > 0 ? "+" : ""}
+                                    {this.formatPercentage(
+                                      currency.change,
+                                      currency.code
+                                    )}
+                                    %
+                                    {currency.change !== 0 && (
+                                      <i
+                                        className={
+                                          currency.change > 0
+                                            ? "bi bi-arrow-up-right"
+                                            : "bi bi-arrow-down-right"
+                                        }
+                                      ></i>
+                                    )}
                                   </span>
                                 </div>
                                 <div className="chart-section">
@@ -485,20 +532,16 @@ class ExchangeRatesDashboard extends Component {
                                           >
                                             <stop
                                               offset="0%"
-                                              stopColor={
-                                                currency.change >= 0
-                                                  ? "#00b894"
-                                                  : "#e17055"
-                                              }
+                                              stopColor={this.getChangeColor(
+                                                currency.change
+                                              )}
                                               stopOpacity="0.3"
                                             />
                                             <stop
                                               offset="100%"
-                                              stopColor={
-                                                currency.change >= 0
-                                                  ? "#00b894"
-                                                  : "#e17055"
-                                              }
+                                              stopColor={this.getChangeColor(
+                                                currency.change
+                                              )}
                                               stopOpacity="0"
                                             />
                                           </linearGradient>
@@ -508,11 +551,9 @@ class ExchangeRatesDashboard extends Component {
                                           points={this.generateRealChartData(
                                             currency.code
                                           )}
-                                          stroke={
-                                            currency.change >= 0
-                                              ? "#00b894"
-                                              : "#e17055"
-                                          }
+                                          stroke={this.getChangeColor(
+                                            currency.change
+                                          )}
                                           strokeWidth="2"
                                           fill="none"
                                           strokeLinecap="butt"
@@ -537,11 +578,9 @@ class ExchangeRatesDashboard extends Component {
                                             cx={circle.x}
                                             cy={circle.y}
                                             r="0.8"
-                                            fill={
-                                              currency.change >= 0
-                                                ? "#00b894"
-                                                : "#e17055"
-                                            }
+                                            fill={this.getChangeColor(
+                                              currency.change
+                                            )}
                                             stroke="white"
                                             strokeWidth="0.3"
                                             vectorEffect="non-scaling-stroke"
@@ -565,7 +604,11 @@ class ExchangeRatesDashboard extends Component {
                   {/* Mobile Cards */}
                   <div className="d-md-none mobile-cards">
                     {exchangeRates.map((currency, index) => (
-                      <div key={currency.code} className="currency-card">
+                      <div
+                        key={currency.code}
+                        className="currency-card"
+                        onClick={() => this.handleCurrencyClick(currency)}
+                      >
                         <div className="currency-card-header">
                           <div className="currency-cell">
                             <div
@@ -583,42 +626,52 @@ class ExchangeRatesDashboard extends Component {
                             </div>
                           </div>
                           <span
-                            className={
-                              currency.change >= 0
-                                ? "change-positive"
-                                : "change-negative"
-                            }
+                            className={this.getChangeClass(currency.change)}
                           >
-                            {currency.change >= 0 ? "+" : ""}
-                            {currency.change.toFixed(1)}%
-                            <i
-                              className={
-                                currency.change >= 0
-                                  ? "bi bi-arrow-up-right"
-                                  : "bi bi-arrow-down-right"
-                              }
-                            ></i>
+                            {currency.change > 0 ? "+" : ""}
+                            {this.formatPercentage(
+                              currency.change,
+                              currency.code
+                            )}
+                            %
+                            {currency.change !== 0 && (
+                              <i
+                                className={
+                                  currency.change > 0
+                                    ? "bi bi-arrow-up-right"
+                                    : "bi bi-arrow-down-right"
+                                }
+                              ></i>
+                            )}
                           </span>
                         </div>
                         <div className="currency-card-body">
                           <div className="rate-row">
                             <span className="rate-label">Kurs NBP:</span>
                             <span className="rate-value">
-                              {currency.rate.toFixed(4)} PLN
+                              {this.formatRate(currency.rate, currency.code)}{" "}
+                              PLN
                             </span>
                           </div>
                           <div className="rate-row">
                             <span className="rate-label">Kurs kupna:</span>
                             <span className="rate-value buy-rate">
                               {currency.buyRate
-                                ? `${currency.buyRate.toFixed(4)} PLN`
+                                ? `${this.formatRate(
+                                    currency.buyRate,
+                                    currency.code
+                                  )} PLN`
                                 : "-"}
                             </span>
                           </div>
                           <div className="rate-row">
                             <span className="rate-label">Kurs sprzedaży:</span>
                             <span className="rate-value sell-rate">
-                              {currency.sellRate.toFixed(4)} PLN
+                              {this.formatRate(
+                                currency.sellRate,
+                                currency.code
+                              )}{" "}
+                              PLN
                             </span>
                           </div>
                           <div className="rate-row">
@@ -647,20 +700,16 @@ class ExchangeRatesDashboard extends Component {
                                     >
                                       <stop
                                         offset="0%"
-                                        stopColor={
-                                          currency.change >= 0
-                                            ? "#00b894"
-                                            : "#e17055"
-                                        }
+                                        stopColor={this.getChangeColor(
+                                          currency.change
+                                        )}
                                         stopOpacity="0.3"
                                       />
                                       <stop
                                         offset="100%"
-                                        stopColor={
-                                          currency.change >= 0
-                                            ? "#00b894"
-                                            : "#e17055"
-                                        }
+                                        stopColor={this.getChangeColor(
+                                          currency.change
+                                        )}
                                         stopOpacity="0"
                                       />
                                     </linearGradient>
@@ -670,11 +719,9 @@ class ExchangeRatesDashboard extends Component {
                                     points={this.generateRealChartData(
                                       currency.code
                                     )}
-                                    stroke={
-                                      currency.change >= 0
-                                        ? "#00b894"
-                                        : "#e17055"
-                                    }
+                                    stroke={this.getChangeColor(
+                                      currency.change
+                                    )}
                                     strokeWidth="2"
                                     fill="none"
                                     strokeLinecap="butt"
@@ -696,11 +743,9 @@ class ExchangeRatesDashboard extends Component {
                                         cx={circle.x}
                                         cy={circle.y}
                                         r="0.8"
-                                        fill={
-                                          currency.change >= 0
-                                            ? "#00b894"
-                                            : "#e17055"
-                                        }
+                                        fill={this.getChangeColor(
+                                          currency.change
+                                        )}
                                         stroke="white"
                                         strokeWidth="0.3"
                                         vectorEffect="non-scaling-stroke"
@@ -724,6 +769,18 @@ class ExchangeRatesDashboard extends Component {
             </div>
           </div>
         </div>
+
+        {/* Currency Details Modal */}
+        {this.state.isModalOpen && this.state.selectedCurrency && (
+          <CurrencyDetailsModal
+            currency={this.state.selectedCurrency}
+            selectedDate={this.state.selectedDate}
+            chartData={
+              this.state.chartData[this.state.selectedCurrency.code] || []
+            }
+            onClose={this.handleModalClose}
+          />
+        )}
       </div>
     );
   }

@@ -260,6 +260,23 @@ body {
   font-size: 11px;
 }
 
+.change-neutral {
+  color: #6c757d;
+  background: rgba(108, 117, 125, 0.1);
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.change-neutral i {
+  font-size: 11px;
+}
+
 .chart-cell-content {
   display: flex;
   align-items: center;
@@ -473,6 +490,327 @@ body {
   height: 100%;
 }
 
+/* History Cards for Mobile */
+.history-cards {
+  padding: 0 24px;
+  display: none;
+}
+
+.history-card {
+  background: white;
+  border-radius: 12px;
+  margin: 0 0 12px 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.history-card:active {
+  transform: scale(0.98);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+.history-card.table-row-highlighted {
+  background: #f8f9fd !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.history-card-header {
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #f8f9fd 0%, #f1f3f6 100%);
+  border-bottom: 1px solid #e9ecef;
+  font-weight: 600;
+  color: #2c3e50;
+  font-size: 15px;
+}
+
+.history-card-body {
+  padding: 12px 16px;
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 20px;
+  box-sizing: border-box;
+  backdrop-filter: blur(4px);
+}
+
+.modal-content {
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  max-width: 1100px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  animation: modalFadeIn 0.3s ease-out;
+  padding-bottom: 30px;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.modal-content::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.modal-header {
+  background: linear-gradient(135deg, #3a57da 0%, #3e44a5 35%, #151786 100%);
+  color: white;
+  padding: 24px 30px;
+  border-radius: 16px 16px 0 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+}
+
+.modal-title-section {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.modal-currency-info h4 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.modal-currency-name {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.modal-close-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.modal-close-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: scale(1.1);
+}
+
+.modal-subtitle {
+  padding: 24px 30px 0;
+  border-bottom: 1px solid #f1f3f4;
+  margin-bottom: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-subtitle h5 {
+  margin: 0;
+  padding-bottom: 16px;
+  color: #2c3e50;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.modal-subtitle .change-positive,
+.modal-subtitle .change-negative {
+  margin-bottom: 16px;
+}
+
+.modal-loading {
+  padding: 60px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.modal-loading p {
+  color: #6c757d;
+  font-size: 16px;
+  margin: 0;
+}
+
+.modal-error {
+  padding: 30px;
+}
+
+.modal-error .alert {
+  margin: 0;
+  text-align: center;
+}
+
+.modal-chart-section {
+  padding: 24px 30px;
+}
+
+.large-chart {
+  height: 300px;
+  border-radius: 8px;
+  border: 1px solid #f1f3f4;
+  background: #fafbfc;
+  position: relative;
+  overflow: hidden;
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+.large-chart svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  padding: 0;
+  margin: 0;
+}
+
+.large-chart svg polyline {
+  vector-effect: non-scaling-stroke;
+}
+
+.large-chart svg circle {
+  vector-effect: non-scaling-stroke;
+}
+
+.chart-point-hover-area {
+  transition: all 0.15s ease;
+}
+
+.chart-point-hover-area:active {
+  r: 6 !important;
+}
+
+.chart-point-highlighted {
+  stroke: black !important;
+  stroke-width: 2 !important;
+  transition: all 0.15s ease;
+}
+
+.no-chart-data {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #6c757d;
+  font-size: 16px;
+  font-style: italic;
+}
+
+.modal-table-section {
+  padding: 0 30px 0px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.table-container {
+  max-height: 300px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border-radius: 8px;
+  margin-bottom: 30px;
+}
+
+.table-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.table-container::-webkit-scrollbar-track {
+  background: #f8f9fd;
+  border-radius: 3px;
+}
+
+.table-container::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.table-container::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0;
+}
+
+.history-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.history-table thead th {
+  background: #f8f9fd;
+  border: none;
+  color: #6c757d;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 16px 20px;
+  border-bottom: 2px solid #e9ecef;
+  text-align: left;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.history-table tbody tr {
+  border: none;
+  transition: background-color 0.2s ease;
+}
+
+.history-table tbody tr:hover {
+  background: #f8f9fd;
+}
+
+.history-table tbody td {
+  border: none;
+  padding: 16px 20px;
+  vertical-align: middle;
+  border-bottom: 1px solid #f1f3f4;
+}
+
+.history-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.table-row-highlighted {
+  background: #f8f9fd !important;
+  transition: all 0.2s ease;
+}
+
 @media (max-width: 768px) {
   .container-fluid {
     padding: 20px 8px;
@@ -495,7 +833,7 @@ body {
   }
 
   .currency-card {
-    cursor: default;
+    cursor: pointer;
     transition: none;
   }
 
@@ -511,6 +849,76 @@ body {
 
   .currency-icon {
     transition: none;
+  }
+
+  .modal-overlay {
+    padding: 10px;
+  }
+
+  .modal-content {
+    max-height: 95vh;
+    padding-bottom: 24px;
+  }
+
+  .modal-header {
+    padding: 20px 24px;
+  }
+
+  .modal-title-section {
+    gap: 12px;
+  }
+
+  .modal-currency-info h4 {
+    font-size: 20px;
+  }
+
+  .modal-subtitle {
+    padding: 20px 24px 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .modal-subtitle h5 {
+    padding-bottom: 0;
+  }
+
+  .modal-subtitle .change-positive,
+  .modal-subtitle .change-negative {
+    margin-bottom: 0;
+  }
+
+  .modal-chart-section {
+    padding: 20px 24px;
+  }
+
+  .large-chart {
+    height: 250px;
+    padding: 0;
+  }
+
+  .modal-table-section {
+    padding: 0 24px 0px;
+  }
+
+  .table-container {
+    display: none;
+  }
+
+  .history-cards {
+    display: block !important;
+    max-height: 250px;
+    overflow-y: auto;
+    margin-bottom: 24px;
+  }
+
+  .history-table thead th {
+    padding: 12px 16px;
+    font-size: 11px;
+  }
+
+  .history-table tbody td {
+    padding: 12px 16px;
   }
 }
 

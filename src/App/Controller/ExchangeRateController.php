@@ -80,7 +80,7 @@ class ExchangeRateController extends AbstractController
                             $exchangeRate = $this->nbpService->calculateExchangeOfficeRates([$nbpRate])[0];
                             
                             // Oblicz percentageChange na podstawie tych samych danych historycznych
-                            $exchangeRate['percentageChange'] = $this->nbpService->calculatePercentageChange($historicalRates);
+                            $exchangeRate['percentageChange'] = $this->nbpService->calculatePercentageChange($historicalRates, $currency);
                             $exchangeRate['trend'] = $exchangeRate['percentageChange'] >= 0 ? 'up' : 'down';
                             
                             $this->logger->info("Currency {$currency}: Using " . count($historicalRates) . " historical data points for calculation");
@@ -113,7 +113,7 @@ class ExchangeRateController extends AbstractController
                             $date
                         );
                         
-                        $rate['percentageChange'] = $this->nbpService->calculatePercentageChange($historicalRates);
+                        $rate['percentageChange'] = $this->nbpService->calculatePercentageChange($historicalRates, $rate['code']);
                         $rate['trend'] = $rate['percentageChange'] >= 0 ? 'up' : 'down';
                         
                         $this->logger->info("Currency {$rate['code']}: Using " . count($historicalRates) . " historical data points for current date calculation");
