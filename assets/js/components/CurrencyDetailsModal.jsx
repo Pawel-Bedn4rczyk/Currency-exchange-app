@@ -1,5 +1,21 @@
 import React, { Component } from "react";
-import axios from "axios";
+import {
+  formatRate,
+  formatPolishDate,
+  formatShortDate,
+  getChangeColor,
+} from "../utils/formatters.js";
+import { fetchCurrencyHistory } from "../utils/apiService.js";
+import {
+  generateChartData,
+  generateChartArea,
+  generateChartCircles,
+} from "../utils/chartUtils.js";
+import { CURRENCIES_WITH_BUY_RATE } from "../utils/constants.js";
+import LoadingSpinner from "./shared/LoadingSpinner.jsx";
+import ErrorMessage from "./shared/ErrorMessage.jsx";
+import CurrencyIcon from "./shared/CurrencyIcon.jsx";
+import PercentageChange from "./shared/PercentageChange.jsx";
 
 class CurrencyDetailsModal extends Component {
   constructor(props) {
@@ -38,39 +54,6 @@ class CurrencyDetailsModal extends Component {
       clearTimeout(this.hoverTimeout);
       this.hoverTimeout = null;
     }
-  }
-
-  // Funkcja pomocnicza do określania koloru na podstawie zmiany procentowej
-  getChangeColor(change) {
-    if (change === 0) return "#6c757d"; // Szary dla 0%
-    return change > 0 ? "#00b894" : "#e17055"; // Zielony dla dodatnich, czerwony dla ujemnych
-  }
-
-  // Funkcja pomocnicza do określania klasy CSS dla zmiany procentowej
-  getChangeClass(change) {
-    if (change === 0) return "change-neutral";
-    return change >= 0 ? "change-positive" : "change-negative";
-  }
-
-  // Formatowanie procentów z odpowiednią precyzją dla różnych walut
-  formatPercentage(change, currencyCode) {
-    // IDR: 3 miejsca po przecinku dla mikro-zmian (0.003%)
-    // Inne: 1 miejsce po przecinku (1.4%)
-    const decimals = currencyCode === "IDR" ? 3 : 1;
-    return change.toFixed(decimals);
-  }
-
-  // Formatowanie kursu waluty z odpowiednią precyzją dla kantoru
-  formatRate(rate, currencyCode = null) {
-    // Dla walut egzotycznych używaj większej precyzji niezależnie od wartości
-    if (currencyCode === "IDR") {
-      return rate.toFixed(8); // 8 miejsc po przecinku dla IDR (precyzja NBP)
-    }
-
-    // Zapasowe formatowanie na podstawie wartości kursu
-    if (rate < 0.001) return rate.toFixed(6); // Inne waluty egzotyczne
-    if (rate < 0.1) return rate.toFixed(5); // Niektóre waluty azjatyckie
-    return rate.toFixed(4); // EUR, USD, waluty standardowe
   }
 
   handleKeyDown = (e) => {
@@ -127,27 +110,21 @@ class CurrencyDetailsModal extends Component {
     // Automatyczne przewinięcie do odpowiadającej karty (mobile) lub wiersza (desktop)
     setTimeout(() => {
       const targetCard = document.querySelector(
-        `.history-card[data-date="${date}"]`
+        `.history-cards .history-card[data-date="${date}"]`
       );
       const targetRow = document.querySelector(`tr[data-date="${date}"]`);
       const historyCardsContainer = document.querySelector(".history-cards");
       const tableContainer = document.querySelector(".table-container");
 
-      // Spróbuj najpierw kart mobilnych
+      // Mobile
       if (targetCard && historyCardsContainer) {
-        const containerHeight = historyCardsContainer.clientHeight;
-        const cardOffsetTop = targetCard.offsetTop;
-        const cardHeight = targetCard.offsetHeight;
-
-        // Wyśrodkuj kartę w kontenerze
-        const scrollTop = cardOffsetTop - containerHeight / 2 + cardHeight / 2;
-
-        historyCardsContainer.scrollTo({
-          top: Math.max(0, scrollTop),
+        targetCard.scrollIntoView({
           behavior: "smooth",
+          block: "center",
+          inline: "nearest",
         });
       }
-      // Zapasowe rozwiązanie dla tabeli desktop
+      // Desktop
       else if (targetRow && tableContainer) {
         const containerHeight = tableContainer.clientHeight;
         const rowOffsetTop = targetRow.offsetTop;
@@ -188,60 +165,33 @@ class CurrencyDetailsModal extends Component {
     this.setState({ hoveredRowDate: null });
   };
 
-  getBaseUrl() {
-    return "http://localhost:8000";
-  }
-
-  fetchHistoryData() {
-    const baseUrl = this.getBaseUrl();
+  async fetchHistoryData() {
     const { currency, selectedDate } = this.props;
 
     this.setState({ loading: true });
 
-    axios
-      .get(`${baseUrl}/api/exchange-rates/history`, {
-        params: {
-          currency: currency.code,
-          date: selectedDate || new Date().toISOString().split("T")[0],
-        },
-      })
-      .then((response) => {
-        if (response.data.status === "success") {
-          this.setState({
-            historyData: response.data.data.history || [],
-            loading: false,
-          });
-        } else {
-          throw new Error(response.data.message || "API error");
-        }
-      })
-      .catch((error) => {
-        console.error("Failed to fetch history data:", error);
+    try {
+      const response = await fetchCurrencyHistory(
+        currency.code,
+        selectedDate || new Date().toISOString().split("T")[0]
+      );
+
+      if (response.status === "success") {
         this.setState({
-          historyData: [],
+          historyData: response.data.history || [],
           loading: false,
-          error: "Nie udało się pobrać danych historycznych. Spróbuj ponownie.",
         });
+      } else {
+        throw new Error(response.message || "API error");
+      }
+    } catch (error) {
+      console.error("Failed to fetch history data:", error);
+      this.setState({
+        historyData: [],
+        loading: false,
+        error: "Nie udało się pobrać danych historycznych. Spróbuj ponownie.",
       });
-  }
-
-  formatPolishDate(dateString) {
-    const date = new Date(dateString);
-    const options = {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    };
-    return date.toLocaleDateString("pl-PL", options);
-  }
-
-  formatShortDate(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("pl-PL", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
+    }
   }
 
   getDateRange() {
@@ -253,102 +203,9 @@ class CurrencyDetailsModal extends Component {
     );
 
     return {
-      from: this.formatShortDate(sortedData[0].effectiveDate),
-      to: this.formatShortDate(sortedData[sortedData.length - 1].effectiveDate),
+      from: formatShortDate(sortedData[0].effectiveDate),
+      to: formatShortDate(sortedData[sortedData.length - 1].effectiveDate),
     };
-  }
-
-  generateRealChartData() {
-    const { historyData } = this.state;
-    if (!historyData || historyData.length === 0) {
-      return null;
-    }
-
-    const sortedData = [...historyData].sort((a, b) => {
-      return new Date(a.effectiveDate) - new Date(b.effectiveDate);
-    });
-
-    const points = [];
-    const numPoints = sortedData.length;
-
-    const rates = sortedData.map((item) => item.nbpRate);
-    const minRate = Math.min(...rates);
-    const maxRate = Math.max(...rates);
-    const range = maxRate - minRate;
-
-    for (let i = 0; i < numPoints; i++) {
-      const item = sortedData[i];
-      const x = numPoints > 1 ? (i / (numPoints - 1)) * 100 : 50;
-      const rate = item.nbpRate;
-
-      let y;
-      if (range === 0) {
-        // Wszystkie wartości są takie same - pozioma linia na środku
-        y = 20;
-      } else {
-        const normalizedRate = ((rate - minRate) / range) * 30 + 5;
-        y = Math.max(5, Math.min(35, normalizedRate));
-      }
-      points.push(`${x},${y}`);
-    }
-
-    return points.join(" ");
-  }
-
-  generateChartArea(points, isPositive) {
-    if (!points) return "";
-
-    const pointArray = points.split(" ").map((p) => p.split(","));
-    const areaPoints = [...pointArray];
-
-    areaPoints.push([pointArray[pointArray.length - 1][0], "40"]);
-    areaPoints.push(["0", "40"]);
-    areaPoints.unshift(["0", pointArray[0][1]]);
-
-    return areaPoints.map((p) => p.join(",")).join(" ");
-  }
-
-  generateChartCircles() {
-    const { historyData } = this.state;
-    if (!historyData || historyData.length === 0) {
-      return [];
-    }
-
-    // Sortuj dane chronologicznie (od najstarszych do najnowszych)
-    const sortedData = [...historyData].sort((a, b) => {
-      return new Date(a.effectiveDate) - new Date(b.effectiveDate);
-    });
-
-    const numPoints = sortedData.length;
-    const rates = sortedData.map((item) => item.nbpRate);
-    const minRate = Math.min(...rates);
-    const maxRate = Math.max(...rates);
-    const range = maxRate - minRate;
-
-    const circles = [];
-    for (let i = 0; i < numPoints; i++) {
-      const item = sortedData[i];
-      const x = numPoints > 1 ? (i / (numPoints - 1)) * 100 : 50;
-      const rate = item.nbpRate;
-
-      let y;
-      if (range === 0) {
-        // Wszystkie wartości są takie same - pozioma linia na środku
-        y = 20;
-      } else {
-        const normalizedRate = ((rate - minRate) / range) * 30 + 5;
-        y = Math.max(5, Math.min(35, normalizedRate));
-      }
-
-      circles.push({
-        x: x,
-        y: y,
-        date: item.effectiveDate,
-        rate: rate,
-      });
-    }
-
-    return circles;
   }
 
   render() {
@@ -356,22 +213,16 @@ class CurrencyDetailsModal extends Component {
     const { historyData, loading, error, hoveredPointDate, hoveredRowDate } =
       this.state;
     const dateRange = this.getDateRange();
-    const hasBuyRate = ["EUR", "USD"].includes(currency.code);
-    const chartPoints = this.generateRealChartData();
-    const chartCircles = this.generateChartCircles();
+    const hasBuyRate = CURRENCIES_WITH_BUY_RATE.includes(currency.code);
+    const chartPoints = generateChartData(historyData);
+    const chartCircles = generateChartCircles(historyData);
 
     return (
       <div className="modal-overlay" onClick={this.handleOverlayClick}>
         <div className="modal-content" ref={this.modalRef}>
           <div className="modal-header">
             <div className="modal-title-section">
-              <div className={`currency-icon ${currency.code.toLowerCase()}`}>
-                {currency.code === "EUR" && "€"}
-                {currency.code === "USD" && "$"}
-                {currency.code === "IDR" && "₹"}
-                {currency.code === "CZK" && "CZK"}
-                {currency.code === "BRL" && "R$"}
-              </div>
+              <CurrencyIcon currency={currency.code} />
               <div className="modal-currency-info">
                 <h4>{currency.code}</h4>
                 <span className="modal-currency-name">{currency.name}</span>
@@ -389,32 +240,22 @@ class CurrencyDetailsModal extends Component {
                 dateRange.to &&
                 `(${dateRange.from} - ${dateRange.to})`}
             </h5>
-            <span className={this.getChangeClass(currency.change)}>
-              {currency.change > 0 ? "+" : ""}
-              {this.formatPercentage(currency.change, currency.code)}%
-              {currency.change !== 0 && (
-                <span>{currency.change > 0 ? "↗" : "↘"}</span>
-              )}
-            </span>
+            <PercentageChange
+              change={currency.change}
+              currencyCode={currency.code}
+            />
           </div>
 
           {loading ? (
             <div className="modal-loading">
-              <div className="spinner"></div>
-              <p>Ładowanie danych historycznych...</p>
+              <LoadingSpinner message="Ładowanie danych historycznych..." />
             </div>
           ) : error ? (
             <div className="modal-error">
-              <div className="alert alert-danger">
-                <h6>Błąd połączenia</h6>
-                <p>{error}</p>
-                <button
-                  className="btn btn-primary"
-                  onClick={() => this.fetchHistoryData()}
-                >
-                  Spróbuj ponownie
-                </button>
-              </div>
+              <ErrorMessage
+                error={error}
+                onRetry={() => this.fetchHistoryData()}
+              />
             </div>
           ) : (
             <>
@@ -440,12 +281,12 @@ class CurrencyDetailsModal extends Component {
                         >
                           <stop
                             offset="0%"
-                            stopColor={this.getChangeColor(currency.change)}
+                            stopColor={getChangeColor(currency.change)}
                             stopOpacity="0.3"
                           />
                           <stop
                             offset="100%"
-                            stopColor={this.getChangeColor(currency.change)}
+                            stopColor={getChangeColor(currency.change)}
                             stopOpacity="0"
                           />
                         </linearGradient>
@@ -453,7 +294,7 @@ class CurrencyDetailsModal extends Component {
                       <polyline
                         className="chart-line"
                         points={chartPoints}
-                        stroke={this.getChangeColor(currency.change)}
+                        stroke={getChangeColor(currency.change)}
                         strokeWidth="2"
                         fill="none"
                         strokeLinecap="butt"
@@ -461,7 +302,7 @@ class CurrencyDetailsModal extends Component {
                       />
                       <polygon
                         className="chart-area"
-                        points={this.generateChartArea(
+                        points={generateChartArea(
                           chartPoints,
                           currency.change >= 0
                         )}
@@ -484,8 +325,8 @@ class CurrencyDetailsModal extends Component {
                             style={{ cursor: "pointer" }}
                           >
                             <title>
-                              {this.formatPolishDate(circle.date)}:{" "}
-                              {this.formatRate(circle.rate, currency.code)} PLN
+                              {formatPolishDate(circle.date)}:{" "}
+                              {formatRate(circle.rate, currency.code)} PLN
                             </title>
                           </circle>
                           {/* Visible point */}
@@ -493,7 +334,7 @@ class CurrencyDetailsModal extends Component {
                             cx={circle.x}
                             cy={circle.y}
                             r="0.8"
-                            fill={this.getChangeColor(currency.change)}
+                            fill={getChangeColor(currency.change)}
                             stroke={
                               hoveredRowDate === circle.date ||
                               hoveredPointDate === circle.date
@@ -558,14 +399,14 @@ class CurrencyDetailsModal extends Component {
                             }
                             onMouseLeave={this.handleRowLeave}
                           >
-                            <td>{this.formatPolishDate(item.effectiveDate)}</td>
+                            <td>{formatPolishDate(item.effectiveDate)}</td>
                             <td className="rate-cell">
-                              {this.formatRate(item.nbpRate, currency.code)} PLN
+                              {formatRate(item.nbpRate, currency.code)} PLN
                             </td>
                             {hasBuyRate && (
                               <td className="buy-rate">
                                 {item.buyRate
-                                  ? `${this.formatRate(
+                                  ? `${formatRate(
                                       item.buyRate,
                                       currency.code
                                     )} PLN`
@@ -573,8 +414,7 @@ class CurrencyDetailsModal extends Component {
                               </td>
                             )}
                             <td className="sell-rate">
-                              {this.formatRate(item.sellRate, currency.code)}{" "}
-                              PLN
+                              {formatRate(item.sellRate, currency.code)} PLN
                             </td>
                           </tr>
                         ))}
@@ -607,13 +447,13 @@ class CurrencyDetailsModal extends Component {
                         style={{ cursor: "pointer" }}
                       >
                         <div className="history-card-header">
-                          {this.formatPolishDate(item.effectiveDate)}
+                          {formatPolishDate(item.effectiveDate)}
                         </div>
                         <div className="history-card-body">
                           <div className="rate-row">
                             <span className="rate-label">Kurs NBP:</span>
                             <span className="rate-value">
-                              {this.formatRate(item.nbpRate, currency.code)} PLN
+                              {formatRate(item.nbpRate, currency.code)} PLN
                             </span>
                           </div>
                           {hasBuyRate && (
@@ -621,7 +461,7 @@ class CurrencyDetailsModal extends Component {
                               <span className="rate-label">Kurs kupna:</span>
                               <span className="rate-value buy-rate">
                                 {item.buyRate
-                                  ? `${this.formatRate(
+                                  ? `${formatRate(
                                       item.buyRate,
                                       currency.code
                                     )} PLN`
@@ -632,8 +472,7 @@ class CurrencyDetailsModal extends Component {
                           <div className="rate-row">
                             <span className="rate-label">Kurs sprzedaży:</span>
                             <span className="rate-value sell-rate">
-                              {this.formatRate(item.sellRate, currency.code)}{" "}
-                              PLN
+                              {formatRate(item.sellRate, currency.code)} PLN
                             </span>
                           </div>
                         </div>
