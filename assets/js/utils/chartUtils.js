@@ -33,7 +33,8 @@ export const generateChartData = (data) => {
       // Wszystkie wartości są takie same - pozioma linia na środku
       y = 20;
     } else {
-      const normalizedRate = ((rate - minRate) / range) * 30 + 5; // Skaluj do 5-35
+      // Odwróć skalę Y - wyższe wartości powinny być wyżej (mniejsze Y w SVG)
+      const normalizedRate = ((maxRate - rate) / range) * 30 + 5; // Skaluj do 5-35
       y = Math.max(5, Math.min(35, normalizedRate));
     }
     points.push(`${x},${y}`);
@@ -82,7 +83,8 @@ export const generateChartCircles = (data) => {
       // Wszystkie wartości są takie same - pozioma linia na środku
       y = 20;
     } else {
-      const normalizedRate = ((rate - minRate) / range) * 30 + 5;
+      // Wyższew wartości wyżej a niższe niżej na wykresie
+      const normalizedRate = ((maxRate - rate) / range) * 30 + 5;
       y = Math.max(5, Math.min(35, normalizedRate));
     }
 
